@@ -3,149 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Umbrella & Translink Map</title>
+    <title>Umbrella & Transit</title>
     <style>
-        :root { --bg: #1a1a1a; --card: rgba(255, 255, 255, 0.1); --text: #ffffff; --accent: #00d2ff; }
+        :root { --bg: #121212; --accent: #00d2ff; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg); color: var(--text);
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; margin: 0; padding: 20px; text-align: center;
-            transition: background-color 1s; overflow-x: hidden;
+            background-color: var(--bg); color: white; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+            transition: background 1s; overflow-x: hidden;
         }
-        #main-card { 
-            margin-top: 20px; z-index: 10; width: 95%; max-width: 400px;
-            background: var(--card); padding: 25px; border-radius: 24px; 
-            backdrop-filter: blur(12px); box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        #card { 
+            margin-top: 20px; z-index: 10; width: 100%; max-width: 400px;
+            background: rgba(255,255,255,0.1); padding: 25px; border-radius: 20px; 
+            backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        #answer { font-size: 5.5rem; font-weight: 800; margin: 15px 0; }
-        #details { font-size: 0.95rem; opacity: 0.8; margin-bottom: 20px; white-space: pre-wrap; }
-        .stop-item { 
+        #answer { font-size: 5rem; font-weight: 800; margin: 10px 0; }
+        #details { font-size: 1rem; opacity: 0.8; margin-bottom: 20px; white-space: pre-wrap; }
+        .stop { 
             display: flex; align-items: center; justify-content: space-between;
-            padding: 16px; margin: 10px 0; background: rgba(255,255,255,0.05); 
-            border-radius: 15px; text-align: left; border: 1px solid rgba(255,255,255,0.1);
+            padding: 15px; margin: 10px 0; background: rgba(255,255,255,0.05); 
+            border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); text-align: left;
         }
-        .stop-info { display: flex; align-items: center; cursor: pointer; flex-grow: 1; }
-        .stop-icon { font-size: 1.8rem; margin-right: 15px; }
-        .stop-name { font-weight: 600; font-size: 1rem; color: #fff; }
-        .map-link { 
-            background: var(--accent); color: #000; padding: 8px 14px; 
-            border-radius: 10px; font-size: 0.75rem; font-weight: bold; 
-            text-decoration: none; margin-left: 10px;
-        }
-        #reset-btn { background: #fff; color: #000; border: none; padding: 12px 24px; border-radius: 30px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .stop-info { cursor: pointer; flex-grow: 1; }
+        .stop-name { font-weight: 600; font-size: 1.1rem; display: block; }
+        .map-btn { background: var(--accent); color: black; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.8rem; }
         #weather-effects { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-        .drop { position: absolute; background: rgba(255,255,255,0.4); width: 2px; height: 25px; animation: fall linear infinite; }
+        .drop { position: absolute; background: rgba(255,255,255,0.4); width: 2px; height: 20px; animation: fall linear infinite; }
         @keyframes fall { to { transform: translateY(110vh); } }
-        .sun { position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: #FFD700; border-radius: 50%; box-shadow: 0 0 60px #FF8C00; }
     </style>
 </head>
 <body>
-    <div id="weather-effects"></div> 
-    <div id="main-card">
-        <h1 id="title">Transit Verdict</h1>
+    <div id="weather-effects"></div>
+    <div id="card">
+        <h1 style="font-size: 1.2rem; opacity: 0.6; margin: 0;">Weather Verdict</h1>
         <p id="answer">⌛</p>
-        <p id="details">Locating your current position...</p>
-        <div id="stops-list"></div>
-        <button id="reset-btn" style="display:none;" onclick="location.reload()">New Search</button>
+        <p id="details">Locating...</p>
+        <div id="stops"></div>
+        <button id="reset" style="display:none; margin-top: 20px; width: 100%; padding: 10px; border-radius: 10px; border: none; cursor: pointer;" onclick="location.reload()">Reset Search</button>
     </div>
 
     <script>
-        let userLat, userLon;
-        const list = document.getElementById('stops-list');
+        let uLat, uLon;
 
-        function getDistance(lat1, lon1, lat2, lon2) {
+        function dist(l1, o1, l2, o2) {
             const R = 6371;
-            const dLat = (lat2-lat1)*Math.PI/180;
-            const dLon = (lon2-lon1)*Math.PI/180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const dL = (l2-l1)*Math.PI/180;
+            const dO = (o2-o1)*Math.PI/180;
+            const a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dO/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000; // returns meters
         }
 
-        async function selectStop(name, stopLat, stopLon) {
-            const dist = getDistance(userLat, userLon, stopLat, stopLon);
-            const walkTime = Math.round((dist / 5) * 60); 
-            const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${userLat}&longitude=${userLon}&hourly=precipitation_probability&forecast_hours=1&timezone=auto`;
+        async function select(name, sLat, sLon) {
+            const d = dist(uLat, uLon, sLat, sLon);
+            const walk = Math.round(d / 80); // 80m per minute avg
+            document.getElementById('reset').style.display = "block";
+            document.getElementById('stops').innerHTML = `<a href="https://www.google.com/maps/dir/?api=1&origin=${uLat},${uLon}&destination=${sLat},${sLon}&travelmode=walking" target="_blank" class="map-btn" style="display:block; text-align:center; padding: 15px;">Open Walking Directions</a>`;
             
-            list.innerHTML = `<a href="https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLon}&destination=${stopLat},${stopLon}&travelmode=walking" target="_blank" class="map-link" style="font-size:1rem; padding:15px; display:block; text-align:center;">Start Walking Route</a>`;
-            document.getElementById('reset-btn').style.display = "block";
+            const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${uLat}&longitude=${uLon}&hourly=precipitation_probability&forecast_hours=1`);
+            const wData = await wRes.json();
+            const rain = wData.hourly.precipitation_probability[0];
 
-            try {
-                const res = await fetch(weatherUrl);
-                const data = await res.json();
-                const rain = data.hourly.precipitation_probability[0];
-                document.getElementById('answer').innerText = rain >= 25 ? "YES ☔" : "NO 🕶️";
-                document.body.style.backgroundColor = rain >= 25 ? "#2c3e50" : "#87CEEB";
-                if(rain >= 25) startRain();
-                document.getElementById('details').innerText = `${name}\n${walkTime} min walk\nRain Probability: ${rain}%`;
-            } catch(e) { document.getElementById('answer').innerText = "??"; }
+            document.getElementById('answer').innerText = rain >= 20 ? "YES ☔" : "NO 🕶️";
+            document.body.style.backgroundColor = rain >= 20 ? "#2c3e50" : "#87CEEB";
+            if(rain >= 20) { for(let i=0; i<50; i++) { let dr = document.createElement('div'); dr.className='drop'; dr.style.left=Math.random()*100+'vw'; dr.style.animationDuration=Math.random()+0.5+'s'; document.getElementById('weather-effects').appendChild(dr); } }
+            document.getElementById('details').innerText = `${name}\n${walk} min walk (${Math.round(d)}m)\nRain chance: ${rain}%`;
         }
 
-        async function fetchStops(lat, lon) {
-            userLat = lat; userLon = lon;
-            document.getElementById('details').innerText = "Searching for Translink stops...";
+        async function findStops(lat, lon) {
+            uLat = lat; uLon = lon;
+            document.getElementById('details').innerText = "Scanning 1km for stops...";
             
-            // TRY OFFICIAL QLD GOV FIRST
-            const qldUrl = `https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Transportation/OtherTransport/MapServer/identify?geometry=${lon},${lat}&geometryType=esriGeometryPoint&sr=4326&layers=all&tolerance=15&mapExtent=${lon-0.01},${lat-0.01},${lon+0.01},${lat+0.01}&imageDisplay=800,600,96&returnGeometry=true&f=pjson&outSR=4326`;
-
+            // Broadest possible Overpass query for Brisbane/QLD
+            const q = `[out:json];(nwr(around:1000)["public_transport"~"platform|station"];nwr(around:1000)["highway"="bus_stop"];nwr(around:1000)["railway"~"station|stop"];);out center;`;
             try {
-                const res = await fetch(qldUrl);
+                const res = await fetch("https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(q));
                 const data = await res.json();
                 
-                if (data.results && data.results.length > 0) {
-                    renderStops(data.results.map(r => ({
-                        name: r.attributes['Stop name'] || r.attributes['Name'],
-                        lat: r.geometry.y, lon: r.geometry.x,
-                        type: r.layerId
-                    })));
-                } else {
-                    throw new Error("Gov API Empty");
+                if(!data.elements || data.elements.length === 0) {
+                    document.getElementById('details').innerText = "No stops found. Try a different spot!";
+                    return;
                 }
-            } catch (e) {
-                // FALLBACK TO OVERPASS
-                const overpassQuery = `[out:json];nwr(around:1000)["public_transport"~"platform|station"];out center;`;
-                const overpassUrl = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(overpassQuery);
-                const res = await fetch(overpassUrl);
-                const data = await res.json();
-                renderStops(data.elements.map(e => ({
-                    name: e.tags.name || e.tags.ref,
-                    lat: e.lat || e.center.lat, lon: e.lon || e.center.lon,
-                    type: e.tags.railway ? 101 : 102
-                })));
-            }
-        }
 
-        function renderStops(stops) {
-            document.getElementById('answer').innerText = "🚏";
-            document.getElementById('details').innerText = "Select a destination:";
-            list.innerHTML = stops.filter(s => s.name).slice(0, 5).map(s => {
-                const d = getDistance(userLat, userLon, s.lat, s.lon);
-                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}`;
-                const icon = s.type == 101 ? "🚆" : (s.type == 103 ? "⛴️" : "🚌");
-                return `<div class="stop-item">
-                            <div class="stop-info" onclick="selectStop('${s.name.replace(/'/g, "\\'")}', ${s.lat}, ${s.lon})">
-                                <span class="stop-icon">${icon}</span>
-                                <div><div class="stop-name">${s.name}</div><div class="walk-dist">${(d*1000).toFixed(0)}m</div></div>
-                            </div>
-                            <a href="${mapUrl}" target="_blank" class="map-link">MAP</a>
-                        </div>`;
-            }).join('');
-        }
-
-        function startRain() {
-            const c = document.getElementById('weather-effects');
-            c.innerHTML = '';
-            for (let i = 0; i < 50; i++) {
-                let d = document.createElement('div'); d.className = 'drop';
-                d.style.left = Math.random() * 100 + 'vw';
-                d.style.animationDuration = (Math.random() * 0.4 + 0.4) + 's';
-                c.appendChild(d);
-            }
+                document.getElementById('answer').innerText = "🚏";
+                document.getElementById('details').innerText = "Select your stop:";
+                
+                const seen = new Set();
+                document.getElementById('stops').innerHTML = data.elements
+                    .filter(e => (e.tags.name || e.tags.ref) && !seen.has(e.tags.name) && seen.add(e.tags.name))
+                    .slice(0, 5).map(e => {
+                        const name = e.tags.name || e.tags.ref;
+                        const sLat = e.lat || e.center.lat;
+                        const sLon = e.lon || e.center.lon;
+                        const d = dist(uLat, uLon, sLat, sLon);
+                        return `<div class="stop"><div class="stop-info" onclick="select('${name.replace(/'/g, "\\'")}', ${sLat}, ${sLon})"><span class="stop-name">${name}</span><span style="font-size:0.8rem; opacity:0.6;">${Math.round(d)}m away</span></div><a href="https://www.google.com/maps/search/?api=1&query=${sLat},${sLon}" target="_blank" class="map-btn">MAP</a></div>`;
+                    }).join('');
+            } catch(err) { document.getElementById('details').innerText = "Connection error. Refresh!"; }
         }
 
         navigator.geolocation.getCurrentPosition(
-            p => fetchStops(p.coords.latitude, p.coords.longitude),
-            () => fetch('https://ipapi.co/json/').then(r => r.json()).then(d => fetchStops(d.latitude, d.longitude))
+            p => findStops(p.coords.latitude, p.coords.longitude),
+            () => fetch('https://ipapi.co/json/').then(r => r.json()).then(d => findStops(d.latitude, d.longitude))
         );
     </script>
 </body>
